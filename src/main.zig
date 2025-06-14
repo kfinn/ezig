@@ -21,14 +21,29 @@ pub fn main() !void {
     try bw.flush(); // Don't forget to flush!
 }
 
-test "parsing a simple template" {
-    var template = try Template.parse(std.testing.allocator, "test template", "<h1><%= page.title %></h1>");
+test "parsing a template" {
+    var template = try Template.parse(std.testing.allocator, "some_template",
+        \\  <h1>
+        \\  <%= props.page.title %>
+        \\  </h1>
+        \\  <ul>
+        \\  <% for (props.bullets) |bullet| { %>
+        \\    <li><%= bullet %></li>
+        \\  <% } %>
+        \\  </ul>
+    );
     defer template.deinit();
 
-    try std.testing.expect(template.nodes.len == 3);
-    try std.testing.expect(std.mem.eql(u8, template.nodes[0].text, "<h1>"));
-    try std.testing.expect(std.mem.eql(u8, template.nodes[1].code_expression, " page.title "));
-    try std.testing.expect(std.mem.eql(u8, template.nodes[2].text, "</h1>"));
+    try std.testing.expectEqual(template.nodes.len, 9);
+    try std.testing.expectEqualSlices(u8, template.nodes[0].text, "  <h1>\n  ");
+    try std.testing.expectEqualSlices(u8, template.nodes[1].code_expression, " props.page.title ");
+    try std.testing.expectEqualSlices(u8, template.nodes[2].text, "\n  </h1>\n  <ul>\n  ");
+    try std.testing.expectEqualSlices(u8, template.nodes[3].code_snippet, " for (props.bullets) |bullet| { ");
+    try std.testing.expectEqualSlices(u8, template.nodes[4].text, "\n    <li>");
+    try std.testing.expectEqualSlices(u8, template.nodes[5].code_expression, " bullet ");
+    try std.testing.expectEqualSlices(u8, template.nodes[6].text, "</li>\n  ");
+    try std.testing.expectEqualSlices(u8, template.nodes[7].code_snippet, " } ");
+    try std.testing.expectEqualSlices(u8, template.nodes[8].text, "\n  </ul>");
 
     const templateZigSource = try template.toZigSource();
     defer std.testing.allocator.free(templateZigSource);
