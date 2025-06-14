@@ -178,10 +178,7 @@ pub fn parse(allocator: std.mem.Allocator, name: [:0]const u8, source: [:0]const
     return .{ .allocator = allocator, .name = name, .nodes = try nodes_builder.toOwnedSlice() };
 }
 
-pub fn toZigSource(self: *const @This()) ![:0]const u8 {
-    var result_builder = std.ArrayList(u8).init(self.allocator);
-    const writer = result_builder.writer();
-
+pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
     try writer.print("pub fn @\"{s}\"(comptime Props: type, allocator: std.mem.Allocator, writer: std.io.AnyWriter, props: Props) !void {{\n", .{self.name});
 
     for (self.nodes) |node| {
@@ -209,8 +206,6 @@ pub fn toZigSource(self: *const @This()) ![:0]const u8 {
     }
 
     try writer.writeAll("}\n");
-
-    return result_builder.toOwnedSliceSentinel(0);
 }
 
 pub fn deinit(self: *@This()) void {

@@ -22,7 +22,7 @@ pub fn main() !void {
 }
 
 test "parsing a template" {
-    var template = try Template.parse(std.testing.allocator, "some_template",
+    var template = try Template.parse(std.testing.allocator, "someTemplate",
         \\  <h1>
         \\  <%= props.page.title %>
         \\  </h1>
@@ -34,6 +34,7 @@ test "parsing a template" {
     );
     defer template.deinit();
 
+    try std.testing.expectEqualStrings(template.name, "someTemplate");
     try std.testing.expectEqual(template.nodes.len, 9);
     try std.testing.expectEqualSlices(u8, template.nodes[0].text, "  <h1>\n  ");
     try std.testing.expectEqualSlices(u8, template.nodes[1].code_expression, " props.page.title ");
@@ -45,8 +46,11 @@ test "parsing a template" {
     try std.testing.expectEqualSlices(u8, template.nodes[7].code_snippet, " } ");
     try std.testing.expectEqualSlices(u8, template.nodes[8].text, "\n  </ul>");
 
-    const templateZigSource = try template.toZigSource();
-    defer std.testing.allocator.free(templateZigSource);
+    var zig_source_builder = std.ArrayList(u8).init(std.testing.allocator);
+    const writer = zig_source_builder.writer().any();
+    try template.writeZigSource(writer);
+    const template_zig_source = try zig_source_builder.toOwnedSliceSentinel(0);
+    defer std.testing.allocator.free(template_zig_source);
 
-    std.debug.print("source: \n{s}", .{templateZigSource});
+    std.debug.print("source: \n{s}", .{template_zig_source});
 }
