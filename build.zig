@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_ezig_lib = @import("src/root.zig");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -58,14 +59,11 @@ pub fn build(b: *std.Build) void {
     const examples_ezig_output = examples_ezig_step.addOutputFileArg("ezig_templates.zig");
     examples_ezig_step.addDirectoryArg(b.path("examples/templates"));
 
-    var dir = std.fs.cwd().openDir("examples/templates", .{ .iterate = true, .no_follow = true }) catch @panic("could not open examples templates dir");
-    defer dir.close();
+    var templates_walker = build_ezig_lib.TemplatesWalker.init(b.allocator, "examples/templates") catch @panic("could not walk templates");
+    defer templates_walker.deinit();
 
-    var walker = dir.walk(b.allocator) catch @panic("could not walk examples templates dir");
-    defer walker.deinit();
-
-    while (walker.next() catch @panic("could not walk examples templates dir")) |walker_entry| {
-        examples_ezig_step.addFileInput(b.path(b.pathJoin(&.{ "examples", "templates", walker_entry.path })));
+    while (templates_walker.next() catch @panic("could not walk examples templates dir")) |template| {
+        examples_ezig_step.addFileInput(b.path(b.pathJoin(&.{ "examples", "templates", template.path })));
     }
 
     examples_mod.addAnonymousImport("ezig_templates", .{
