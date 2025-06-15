@@ -1,0 +1,4 @@
+<tr>
+  <td><%= props.row.name %></td>
+  <td><%= props.row.description %></td>
+</tr>

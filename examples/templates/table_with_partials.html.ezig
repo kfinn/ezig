@@ -1,0 +1,7 @@
+<table>
+<tbody>
+<% for (props.rows) |row| {
+  try @"table_row.html"(struct { row: @TypeOf(row) }, writer, .{ .row = row });
+} %>
+</tbody>
+</table>

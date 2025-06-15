@@ -1,0 +1,9 @@
+<% _ = props; %>
+<div><%= "%>\"%>\\%>\"%>\\" %></div>
+<div>
+<%=
+  \\ hello
+  \\ this is a long string
+  \\ %>
+%>
+</div>

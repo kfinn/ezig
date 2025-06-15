@@ -33,6 +33,7 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
     const start_code_snippet_token = "<%";
     const end_code_token = "%>";
     const start_multiline_string_literal_token = "\\\\";
+    const escaped_backslash_token = "\\\\";
     const escaped_quote_token = "\\\"";
     const start_comment_token = "//";
 
@@ -43,12 +44,12 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
         const remaining_source = self.source[index..];
         switch (state) {
             .text => if (std.mem.startsWith(u8, remaining_source, start_code_expression_token)) {
-                try writeTextNodeToZigSource(writer, self.source[state_start_index..index]);
+                if (state_start_index != index) try writeTextNodeToZigSource(writer, self.source[state_start_index..index]);
                 index += start_code_expression_token.len;
                 state_start_index = index;
                 state = .code_expression_start_of_line;
             } else if (std.mem.startsWith(u8, remaining_source, start_code_snippet_token)) {
-                try writeTextNodeToZigSource(writer, self.source[state_start_index..index]);
+                if (state_start_index != index) try writeTextNodeToZigSource(writer, self.source[state_start_index..index]);
                 index += start_code_snippet_token.len;
                 state_start_index = index;
                 state = .code_snippet_start_of_line;
@@ -98,7 +99,9 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
             } else {
                 index += 1;
             },
-            .code_expression_string_literal => if (std.mem.startsWith(u8, remaining_source, escaped_quote_token)) {
+            .code_expression_string_literal => if (std.mem.startsWith(u8, remaining_source, escaped_backslash_token)) {
+                index += escaped_backslash_token.len;
+            } else if (std.mem.startsWith(u8, remaining_source, escaped_quote_token)) {
                 index += escaped_quote_token.len;
             } else if (remaining_source[0] == '"') {
                 index += 1;
@@ -155,7 +158,9 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
             } else {
                 index += 1;
             },
-            .code_snippet_string_literal => if (std.mem.startsWith(u8, remaining_source, escaped_quote_token)) {
+            .code_snippet_string_literal => if (std.mem.startsWith(u8, remaining_source, escaped_backslash_token)) {
+                index += escaped_backslash_token.len;
+            } else if (std.mem.startsWith(u8, remaining_source, escaped_quote_token)) {
                 index += escaped_quote_token.len;
             } else if (remaining_source[0] == '"') {
                 index += 1;
