@@ -1,17 +1,20 @@
 const std = @import("std");
 
-allocator: std.mem.Allocator,
 name: [:0]const u8,
-nodes: []Node,
+source: [:0]const u8,
 
-pub const Node = union(enum) {
+const Node = union(enum) {
     text: []const u8,
     code_expression: []const u8,
     code_snippet: []const u8,
 };
 
-pub fn parse(allocator: std.mem.Allocator, name: [:0]const u8, source: [:0]const u8) std.mem.Allocator.Error!@This() {
-    var nodes_builder = std.ArrayList(Node).init(allocator);
+pub fn init(name: [:0]const u8, source: [:0]const u8) @This() {
+    return .{ .name = name, .source = source };
+}
+
+pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
+    try writer.print("pub fn @\"{s}\"(comptime Props: type, writer: std.io.AnyWriter, props: Props) !void {{\n", .{self.name});
 
     const State = union(enum) {
         text,
@@ -36,16 +39,16 @@ pub fn parse(allocator: std.mem.Allocator, name: [:0]const u8, source: [:0]const
     var state: State = .text;
     var index: usize = 0;
     var state_start_index: usize = 0;
-    while (index < source.len) {
-        const remaining_source = source[index..];
+    while (index < self.source.len) {
+        const remaining_source = self.source[index..];
         switch (state) {
             .text => if (std.mem.startsWith(u8, remaining_source, start_code_expression_token)) {
-                try nodes_builder.append(.{ .text = source[state_start_index..index] });
+                try writeTextNodeToZigSource(writer, self.source[state_start_index..index]);
                 index += start_code_expression_token.len;
                 state_start_index = index;
                 state = .code_expression_start_of_line;
             } else if (std.mem.startsWith(u8, remaining_source, start_code_snippet_token)) {
-                try nodes_builder.append(.{ .text = source[state_start_index..index] });
+                try writeTextNodeToZigSource(writer, self.source[state_start_index..index]);
                 index += start_code_snippet_token.len;
                 state_start_index = index;
                 state = .code_snippet_start_of_line;
@@ -53,7 +56,7 @@ pub fn parse(allocator: std.mem.Allocator, name: [:0]const u8, source: [:0]const
                 index += 1;
             },
             .code_expression_start_of_line => if (std.mem.startsWith(u8, remaining_source, end_code_token)) {
-                try nodes_builder.append(.{ .code_expression = source[state_start_index..index] });
+                try writeCodeExpressionNodeToZigSource(writer, self.source[state_start_index..index]);
                 index += end_code_token.len;
                 state_start_index = index;
                 state = .text;
@@ -73,7 +76,7 @@ pub fn parse(allocator: std.mem.Allocator, name: [:0]const u8, source: [:0]const
                 index += 1;
             },
             .code_expression_middle_of_line => if (std.mem.startsWith(u8, remaining_source, end_code_token)) {
-                try nodes_builder.append(.{ .code_expression = source[state_start_index..index] });
+                try writeCodeExpressionNodeToZigSource(writer, self.source[state_start_index..index]);
                 index += end_code_token.len;
                 state_start_index = index;
                 state = .text;
@@ -110,7 +113,7 @@ pub fn parse(allocator: std.mem.Allocator, name: [:0]const u8, source: [:0]const
                 index += 1;
             },
             .code_snippet_start_of_line => if (std.mem.startsWith(u8, remaining_source, end_code_token)) {
-                try nodes_builder.append(.{ .code_snippet = source[state_start_index..index] });
+                try writeCodeSnippetNodeToZigSource(writer, self.source[state_start_index..index]);
                 index += end_code_token.len;
                 state_start_index = index;
                 state = .text;
@@ -130,7 +133,7 @@ pub fn parse(allocator: std.mem.Allocator, name: [:0]const u8, source: [:0]const
                 index += 1;
             },
             .code_snippet_middle_of_line => if (std.mem.startsWith(u8, remaining_source, end_code_token)) {
-                try nodes_builder.append(.{ .code_snippet = source[state_start_index..index] });
+                try writeCodeSnippetNodeToZigSource(writer, self.source[state_start_index..index]);
                 index += end_code_token.len;
                 state_start_index = index;
                 state = .text;
@@ -170,45 +173,33 @@ pub fn parse(allocator: std.mem.Allocator, name: [:0]const u8, source: [:0]const
     }
     if (index != state_start_index) {
         if (state == .text) {
-            try nodes_builder.append(.{ .text = source[state_start_index..] });
+            try writeTextNodeToZigSource(writer, self.source[state_start_index..]);
         } else {
             unreachable;
-        }
-    }
-    return .{ .allocator = allocator, .name = name, .nodes = try nodes_builder.toOwnedSlice() };
-}
-
-pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
-    try writer.print("pub fn @\"{s}\"(comptime Props: type, writer: std.io.AnyWriter, props: Props) !void {{\n", .{self.name});
-
-    for (self.nodes) |node| {
-        switch (node) {
-            .text => |text| {
-                try writer.writeAll("try writer.writeAll(\"");
-                for (text) |character| {
-                    switch (character) {
-                        '\n' => try writer.writeAll("\\n"),
-                        '\\' => try writer.writeAll("\\\\"),
-                        '"' => try writer.writeAll("\\\""),
-                        else => try writer.writeByte(character),
-                    }
-                }
-                try writer.writeAll("\");\n");
-            },
-            .code_expression => |code_expression| {
-                try writer.print("try writer.print(\"{{s}}\", .{{ {s} }});\n", .{code_expression});
-            },
-            .code_snippet => |code_snippet| {
-                try writer.writeAll(code_snippet);
-                try writer.writeByte('\n');
-            },
         }
     }
 
     try writer.writeAll("}\n");
 }
 
-pub fn deinit(self: *@This()) void {
-    self.allocator.free(self.nodes);
-    self.* = undefined;
+fn writeTextNodeToZigSource(writer: std.io.AnyWriter, text_node: []const u8) !void {
+    try writer.writeAll("try writer.writeAll(\"");
+    for (text_node) |character| {
+        switch (character) {
+            '\n' => try writer.writeAll("\\n"),
+            '\\' => try writer.writeAll("\\\\"),
+            '"' => try writer.writeAll("\\\""),
+            else => try writer.writeByte(character),
+        }
+    }
+    try writer.writeAll("\");\n");
+}
+
+fn writeCodeExpressionNodeToZigSource(writer: std.io.AnyWriter, code_expression: []const u8) !void {
+    try writer.print("try writer.print(\"{{s}}\", .{{ {s} }});\n", .{code_expression});
+}
+
+fn writeCodeSnippetNodeToZigSource(writer: std.io.AnyWriter, code_snippet: []const u8) !void {
+    try writer.writeAll(code_snippet);
+    try writer.writeByte('\n');
 }
