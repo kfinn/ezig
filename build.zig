@@ -3,11 +3,26 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const ezig_lib_mod = b.createModule(.{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const ezig_lib = b.addLibrary(.{
+        .name = "ezig_lib",
+        .root_module = ezig_lib_mod,
+    });
+
+    b.installArtifact(ezig_lib);
+
     const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
+
+    exe_mod.addImport("ezig_lib", ezig_lib_mod);
 
     const exe = b.addExecutable(.{
         .name = "ezig",
@@ -33,10 +48,25 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    const examples_ezig_exe = b.addExecutable(.{ .name = "examples_ezig", .root_source_file = b.path("src/main.zig"), .target = b.graph.host });
+    const examples_ezig_exe = b.addExecutable(.{
+        .name = "examples_ezig",
+        .root_source_file = b.path("src/main.zig"),
+        .target = b.graph.host,
+    });
+    examples_ezig_exe.root_module.addImport("ezig_lib", ezig_lib_mod);
     const examples_ezig_step = b.addRunArtifact(examples_ezig_exe);
     const examples_ezig_output = examples_ezig_step.addOutputFileArg("ezig_templates.zig");
     examples_ezig_step.addDirectoryArg(b.path("examples/templates"));
+
+    var dir = std.fs.cwd().openDir("examples/templates", .{ .iterate = true, .no_follow = true }) catch @panic("could not open examples templates dir");
+    defer dir.close();
+
+    var walker = dir.walk(b.allocator) catch @panic("could not walk examples templates dir");
+    defer walker.deinit();
+
+    while (walker.next() catch @panic("could not walk examples templates dir")) |walker_entry| {
+        examples_ezig_step.addFileInput(b.path(b.pathJoin(&.{ "examples", "templates", walker_entry.path })));
+    }
 
     examples_mod.addAnonymousImport("ezig_templates", .{
         .root_source_file = examples_ezig_output,
