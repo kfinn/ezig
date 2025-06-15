@@ -1,0 +1,5 @@
+<ul>
+<% for (props.items) |item| { %>
+<li><%= item %></li>
+<% } %>
+</ul>

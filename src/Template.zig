@@ -179,12 +179,12 @@ pub fn parse(allocator: std.mem.Allocator, name: [:0]const u8, source: [:0]const
 }
 
 pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
-    try writer.print("pub fn @\"{s}\"(comptime Props: type, allocator: std.mem.Allocator, writer: std.io.AnyWriter, props: Props) !void {{\n", .{self.name});
+    try writer.print("pub fn @\"{s}\"(comptime Props: type, writer: std.io.AnyWriter, props: Props) !void {{\n", .{self.name});
 
     for (self.nodes) |node| {
         switch (node) {
             .text => |text| {
-                try writer.writeAll("writer.writeAll(\"");
+                try writer.writeAll("try writer.writeAll(\"");
                 for (text) |character| {
                     switch (character) {
                         '\n' => try writer.writeAll("\\n"),
@@ -196,7 +196,7 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
                 try writer.writeAll("\");\n");
             },
             .code_expression => |code_expression| {
-                try writer.print("writer.print(\"{{s}}\", .{{ {s} }});\n", .{code_expression});
+                try writer.print("try writer.print(\"{{s}}\", .{{ {s} }});\n", .{code_expression});
             },
             .code_snippet => |code_snippet| {
                 try writer.writeAll(code_snippet);
