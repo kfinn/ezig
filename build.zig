@@ -80,3 +80,34 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_exe_unit_tests.step);
     test_step.dependOn(&run_examples_tests.step);
 }
+
+pub const EzigTemplatesImportOptions = struct {
+    path: []const u8,
+    import_name: []const u8 = "ezig_templates",
+};
+
+pub fn addEzigTemplatesImport(module: *std.Build.Module, options: EzigTemplatesImportOptions) void {
+    var b = module.owner;
+
+    const ezig_depepdency = b.dependency("ezig", .{});
+    const ezig_exe = b.addExecutable(.{
+        .name = "ezig",
+        .root_source_file = ezig_depepdency.path("src/main.zig"),
+        .target = b.graph.host,
+    });
+    ezig_exe.root_module.addImport("ezig_lib", ezig_depepdency.module("ezig_lib"));
+    const ezig_step = b.addRunArtifact(ezig_exe);
+    const ezig_output = ezig_step.addOutputFileArg("ezig_templates.zig");
+    ezig_step.addDirectoryArg(b.path(options.path));
+
+    var templates_walker = build_ezig_lib.TemplatesWalker.init(b.allocator, options.path) catch @panic("could not walk templates");
+    defer templates_walker.deinit();
+
+    while (templates_walker.next() catch @panic("could not walk examples templates dir")) |template| {
+        ezig_step.addFileInput(b.path(b.pathJoin(&.{ options.path, template.path })));
+    }
+
+    module.addAnonymousImport(options.import_name, .{
+        .root_source_file = ezig_output,
+    });
+}
