@@ -1,33 +1,67 @@
 const std = @import("std");
-const ezig_lib = @import("ezig_lib");
-const Template = ezig_lib.Template;
+const TemplatesWalker = @import("TemplatesWalker.zig");
 
 pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
     const allocator = gpa.allocator();
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    var args = try std.process.argsWithAllocator(allocator);
+    defer args.deinit();
 
-    if (args.len != 3) fatal("wrong number of arguments. 3 required, got {}", .{args.len});
+    std.debug.assert(args.skip());
+    const command = args.next() orelse fatal("Requires a command. Expected list or generate.", .{});
+    if (std.mem.eql(u8, command, "list")) {
+        try list(allocator, &args);
+    } else if (std.mem.eql(u8, command, "generate")) {
+        try generate(allocator, &args);
+    } else {
+        fatal("Unkonwn command: {s}. Expected list or generate.\n", .{command});
+    }
 
-    const output_file_path = args[1];
-    const templates_path = args[2];
+    return std.process.cleanExit();
+}
 
-    var templates_walker = try ezig_lib.TemplatesWalker.init(allocator, templates_path);
-    defer templates_walker.deinit();
+fn list(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
+    const output_file_path = args.next() orelse fatal("Missing output file argument.", .{});
+    const templates_path = args.next() orelse fatal("Missing templates argument.", .{});
 
     const output_file = try std.fs.cwd().createFile(output_file_path, .{});
     defer output_file.close();
-
     const output_file_writer = output_file.writer().any();
-    try output_file_writer.writeAll("const std = @import(\"std\");\n");
+
+    var templates_walker = try TemplatesWalker.init(allocator, templates_path);
+    defer templates_walker.deinit();
 
     while (try templates_walker.next()) |template| {
-        try output_file_writer.writeByte('\n');
-        try template.writeZigSource(output_file_writer);
+        try output_file_writer.print("{s}\n", .{template.path});
     }
-    return std.process.cleanExit();
+}
+
+fn generate(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
+    const output_file_path = args.next() orelse fatal("Missing output file argument.", .{});
+    const templates_path = args.next() orelse fatal("Missing templates argument.", .{});
+    const dependencies_file_path = args.next() orelse fatal("Missing dependencies argument", .{});
+
+    const output_file = try std.fs.cwd().createFile(output_file_path, .{});
+    defer output_file.close();
+    const output_file_writer = output_file.writer().any();
+
+    var templates_walker = try TemplatesWalker.init(allocator, templates_path);
+    defer templates_walker.deinit();
+
+    const dependencies_file = try std.fs.cwd().createFile(dependencies_file_path, .{});
+    defer dependencies_file.close();
+    const dependencies_file_writer = dependencies_file.writer().any();
+
+    try output_file_writer.writeAll("const std = @import(\"std\");\n\n");
+    try dependencies_file_writer.writeAll("ezig_templates:");
+
+    while (try templates_walker.next()) |template| {
+        try template.writeZigSource(output_file_writer);
+        try output_file_writer.writeByte('\n');
+
+        try dependencies_file_writer.print(" {s}/{s}", .{ templates_path, template.path });
+    }
 }
 
 fn fatal(comptime format: []const u8, args: anytype) noreturn {
