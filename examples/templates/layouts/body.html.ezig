@@ -1,0 +1,2 @@
+<h1>Layout Example</h1>
+<div><%= props.text %></div>

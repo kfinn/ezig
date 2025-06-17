@@ -74,6 +74,38 @@ test "table with partials" {
     );
 }
 
+test "layouts" {
+    const Props = struct {
+        title: [:0]const u8,
+
+        pub fn writeTitle(self: *const @This(), writer: std.io.AnyWriter) !void {
+            try writer.writeAll(self.title);
+        }
+
+        pub fn writeBody(self: *const @This(), writer: std.io.AnyWriter) !void {
+            const BodyProps = struct { text: [:0]const u8 };
+            const bodyProps = BodyProps{ .text = self.title };
+            try ezig_templates.@"layouts/body.html"(BodyProps, writer, bodyProps);
+        }
+    };
+    const props = Props{ .title = "Ezig Templates" };
+
+    var buf = std.ArrayList(u8).init(std.testing.allocator);
+    defer buf.deinit();
+    const writer = buf.writer().any();
+
+    try ezig_templates.@"layouts/layout.html"(Props, writer, props);
+
+    const actual = try buf.toOwnedSliceSentinel(0);
+    defer std.testing.allocator.free(actual);
+    const squished_actual = try squish(std.testing.allocator, actual);
+    defer std.testing.allocator.free(squished_actual);
+    try std.testing.expectEqualStrings(
+        "<html> <head> <title> Ezig Templates </title> </head> <body> <h1>Layout Example</h1> <div>Ezig Templates</div> </body> </html>",
+        squished_actual,
+    );
+}
+
 fn squish(allocator: std.mem.Allocator, original: [:0]const u8) ![:0]u8 {
     const State = enum { squishing, writing };
     var state: State = .squishing;

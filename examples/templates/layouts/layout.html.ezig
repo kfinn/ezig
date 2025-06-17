@@ -1,0 +1,16 @@
+<html>
+  <head>
+    <title>
+      <%
+        if (@hasDecl(Props, "writeTitle")) {
+          try props.writeTitle(writer);
+        } else {
+          try writer.writeAll("Ezig");
+        }
+      %>
+    </title>
+  </head>
+  <body>
+    <% try props.writeBody(writer); %>
+  </body>
+</html>

@@ -53,6 +53,7 @@ Find test cases covering several examples in [examples/tests.zig](./examples/tes
   - `std`: the standard library.
   - `writer`: the `std.io.AnyWriter` instance where this template is being rendered.
   - `props`: the props provided by the caller.
+  - `Props`: the `type` of `props` provided by the caller.
 
 ### Rendering a string prop
 
@@ -80,9 +81,46 @@ Given a template file named `dog_details.html.ezig`...
 ```
 <%
   const NestedTemplateProps = struct { name: [:0]const u8, description: [:0]const u8 };
-  const nestedTempalteProps = NestedTemplateProps{ .name = props.name, .description = props.description };
+  const nestedTemplateProps = NestedTemplateProps{ .name = props.name, .description = props.description };
   @"dog_details.html"(NestedTemplateProps, writer, nestedTemplateProps);
 %>
+```
+
+### Layouts
+
+With a layout template `layout.html.ezig`:
+
+```
+<html>
+  <body>
+    <% try props.writeBodyContent(writer) %>
+  </body>
+</html>
+```
+
+And a content template `content.html.ezig`:
+
+```
+<div><%= props.text %></div>
+```
+
+Compose them by including behavior in the `Props` type passed into the layout:
+
+```
+const LayoutProps = struct {
+  text: [:0]const u8,
+
+  pub fn writeBodyContent(self: *@This(), writer: std.io.AnyWriter) !void {
+    const ContentProps = struct { text: [:0]const u8 };
+    const contentProps = ContentProps{ .text = self.text };
+
+    try ezig_templates.@"content.html"(ContentProps, writer, contentProps);
+  }
+}
+
+const layoutProps = LayoutProps{ .text = "Body text" };
+
+try ezig_templates.@"layout.html"(LayoutProps, writer, layoutProps);
 ```
 
 ### No-prop templates
