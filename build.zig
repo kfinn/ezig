@@ -35,7 +35,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    addEzigTemplatesImport(examples_mod, .{ .path = "examples/templates" });
+    const examples_ezig_exe = b.addExecutable(.{
+        .name = "examples_ezig",
+        .root_source_file = b.path("src/main.zig"),
+        .target = b.graph.host,
+    });
+
+    addEzigTemplateImportExe(examples_mod, .{ .path = "examples/templates" }, examples_ezig_exe);
 
     const examples_tests = b.addTest(.{
         .root_module = examples_mod,
@@ -55,24 +61,26 @@ pub const EzigTemplatesImportOptions = struct {
 
 pub fn addEzigTemplatesImport(module: *std.Build.Module, options: EzigTemplatesImportOptions) void {
     const b = module.owner;
+    const ezig_dep = b.dependency("ezig", .{ .target = b.graph.host });
+    const ezig_exe = ezig_dep.artifact("ezig");
 
-    const ezig_exe = b.addExecutable(.{
-        .name = "examples_ezig",
-        .root_source_file = b.path("src/main.zig"),
-        .target = b.graph.host,
-    });
+    addEzigTemplateImportExe(module, options, ezig_exe);
+}
+
+fn addEzigTemplateImportExe(module: *std.Build.Module, options: EzigTemplatesImportOptions, ezig_exe: *std.Build.Step.Compile) void {
+    const b = module.owner;
 
     const ezig_list_only_step = b.addRunArtifact(ezig_exe);
     ezig_list_only_step.has_side_effects = true;
     ezig_list_only_step.addArg("list");
-    const ezig_list_only_output = ezig_list_only_step.addOutputFileArg("ezig_templates.txt");
+    const ezig_list_only_output = ezig_list_only_step.addOutputFileArg("ezig_templates_list.txt");
     ezig_list_only_step.addDirectoryArg(b.path(options.path));
 
     const ezig_generate_step = b.addRunArtifact(ezig_exe);
     ezig_generate_step.addArg("generate");
     const ezig_output = ezig_generate_step.addOutputFileArg("ezig_templates.zig");
     ezig_generate_step.addDirectoryArg(b.path(options.path));
-    _ = ezig_generate_step.addDepFileOutputArg("generated_templates.d");
+    _ = ezig_generate_step.addDepFileOutputArg("ezig_templates.d");
     ezig_generate_step.addFileInput(ezig_list_only_output);
 
     module.addAnonymousImport(options.import_name, .{
