@@ -84,3 +84,7 @@ Given a template file named `dog_details.html.ezig`...
   @"dog_details.html"(NestedTemplateProps, writer, nestedTemplateProps);
 %>
 ```
+
+### No-prop templates
+
+To render a template with no props, make sure to include the line `<% _ = props; %>` somewhere in your template.

@@ -33,7 +33,7 @@ pub fn deinit(self: *@This()) void {
 }
 
 pub fn name(self: *const @This()) []const u8 {
-    return self.basename[0 .. self.basename.len - filename_extension.len];
+    return self.path[0 .. self.path.len - filename_extension.len];
 }
 
 pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
