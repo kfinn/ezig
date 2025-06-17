@@ -14,7 +14,7 @@ Update your `build.zig` to generate and import templates into your codebase:
 
 ```
 const ezig = @import("ezig");
-ezig.addEzigTemplatesImport(exe_mod, .{ .path = "src/views" });
+_ = ezig.addEzigTemplatesImport(exe_mod, .{ .path = "src/views" });
 ```
 
 Implement a view, e.g. `src/views/index.html.ezig`:
@@ -123,10 +123,39 @@ const layoutProps = LayoutProps{ .text = "Body text" };
 try ezig_templates.@"layout.html"(LayoutProps, writer, layoutProps);
 ```
 
+### View helpers
+
+To implement a view helper function which can be called from a template...
+
+First, configure `build.zig` to have the generated templates import your app module:
+
+```
+const ezig_templates_mod = ezig.addEzigTemplatesImport(exe_mod, .{ .path = "src/app/views" });
+ezig_templates_mod.addImport("view_helpers", exe_mod);
+```
+
+Then, add a view helper to your app:
+
+```
+// Note: this helper can only be called safely with parameters that have
+// already been properly escaped for HTML rendering.
+pub fn writeLinkTo(writer: std.io.AnyWriter, body: []const u8, url: []const u8) !void {
+    try writer.print("<a href={s}>{s}</a>", .{ url, body });
+}
+```
+
+Then you can consume your view helper from your template:
+
+```
+<%
+  const view_helpers = @import("view_helpers");
+  try view_helpers.writeLinkTo(writer, "https://www.ziglang.org", "Zig Lang");
+%>
+```
+
 ### No-prop templates
 
 To render a template with no props, make sure to include the line `<% _ = props; %>` somewhere in your template.
-
 
 ## Future Work
 

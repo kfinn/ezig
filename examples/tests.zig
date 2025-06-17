@@ -106,6 +106,27 @@ test "layouts" {
     );
 }
 
+pub fn writeLinkTo(writer: std.io.AnyWriter, href: [:0]const u8, body: [:0]const u8) !void {
+    try writer.print("<a href=\"{s}\">{s}</a>", .{ href, body });
+}
+
+test "view helpers" {
+    var buf = std.ArrayList(u8).init(std.testing.allocator);
+    defer buf.deinit();
+    const writer = buf.writer().any();
+
+    try ezig_templates.@"view_helper.html"(struct {}, writer, .{});
+
+    const actual = try buf.toOwnedSliceSentinel(0);
+    defer std.testing.allocator.free(actual);
+    const squished_actual = try squish(std.testing.allocator, actual);
+    defer std.testing.allocator.free(squished_actual);
+    try std.testing.expectEqualStrings(
+        "<a href=\"https://www.ziglang.org\">Zig</a>",
+        squished_actual,
+    );
+}
+
 fn squish(allocator: std.mem.Allocator, original: [:0]const u8) ![:0]u8 {
     const State = enum { squishing, writing };
     var state: State = .squishing;

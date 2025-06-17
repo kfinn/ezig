@@ -1,0 +1,5 @@
+<%
+  _ = props;
+  const app = @import("app");
+  try app.writeLinkTo(writer, "https://www.ziglang.org", "Zig");
+%>

@@ -41,7 +41,8 @@ pub fn build(b: *std.Build) void {
         .target = b.graph.host,
     });
 
-    addEzigTemplateImportExe(examples_mod, .{ .path = "examples/templates" }, examples_ezig_exe);
+    const examples_ezig_templates_mod = addEzigTemplateImportExe(examples_mod, .{ .path = "examples/templates" }, examples_ezig_exe);
+    examples_ezig_templates_mod.addImport("app", examples_mod);
 
     const examples_tests = b.addTest(.{
         .root_module = examples_mod,
@@ -59,15 +60,15 @@ pub const EzigTemplatesImportOptions = struct {
     import_name: []const u8 = "ezig_templates",
 };
 
-pub fn addEzigTemplatesImport(module: *std.Build.Module, options: EzigTemplatesImportOptions) void {
+pub fn addEzigTemplatesImport(module: *std.Build.Module, options: EzigTemplatesImportOptions) *std.Build.Module {
     const b = module.owner;
     const ezig_dep = b.dependency("ezig", .{ .target = b.graph.host });
     const ezig_exe = ezig_dep.artifact("ezig");
 
-    addEzigTemplateImportExe(module, options, ezig_exe);
+    return addEzigTemplateImportExe(module, options, ezig_exe);
 }
 
-fn addEzigTemplateImportExe(module: *std.Build.Module, options: EzigTemplatesImportOptions, ezig_exe: *std.Build.Step.Compile) void {
+fn addEzigTemplateImportExe(module: *std.Build.Module, options: EzigTemplatesImportOptions, ezig_exe: *std.Build.Step.Compile) *std.Build.Module {
     const b = module.owner;
 
     const ezig_list_only_step = b.addRunArtifact(ezig_exe);
@@ -83,7 +84,8 @@ fn addEzigTemplateImportExe(module: *std.Build.Module, options: EzigTemplatesImp
     _ = ezig_generate_step.addDepFileOutputArg("ezig_templates.d");
     ezig_generate_step.addFileInput(ezig_list_only_output);
 
-    module.addAnonymousImport(options.import_name, .{
-        .root_source_file = ezig_output,
-    });
+    const ezig_templates_mod = b.createModule(.{ .root_source_file = ezig_output });
+    module.addImport(options.import_name, ezig_templates_mod);
+
+    return ezig_templates_mod;
 }
