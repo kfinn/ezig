@@ -88,3 +88,10 @@ Given a template file named `dog_details.html.ezig`...
 ### No-prop templates
 
 To render a template with no props, make sure to include the line `<% _ = props; %>` somewhere in your template.
+
+
+## Future Work
+
+- UTF-8 support and test coverage. Currently UTF-8 mostly works by accident, but the parsing and escaping code isn't aware of it, so there are likely bugs.
+- Support for storing template data in separate files instead of compiling it into the binary, for a smaller binary size.
+- More safety for template names. Currently a template's name is just its relative path, with no escaping.
