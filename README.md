@@ -1,3 +1,86 @@
 # ezig
 
-Compiled Zig templates, inspired by [erb](https://github.com/ruby/erb).
+Simple compiled Zig templates, inspired by [erb](https://github.com/ruby/erb).
+
+## Usage
+
+Add this as a dependency:
+
+```
+zig fetch --save git+https://github.com/kfinn/ezig
+```
+
+Update your `build.zig` to generate and import templates into your codebase:
+
+```
+const ezig = @import("ezig");
+ezig.addEzigTemplatesImport(exe_mod, .{ .path = "src/views" });
+```
+
+Implement a view, e.g. `src/views/index.html.ezig`:
+
+```
+<div>All your <%= props.name %> are belong to us.</div>
+```
+
+Within your code, render a template:
+
+```
+const std = @import("std");
+const ezig_templates = @import("ezig_templates");
+
+pub fn main() !void {
+  const stdout_file = std.io.getStdOut().writer();
+  var bw = std.io.bufferedWriter(stdout_file);
+
+  const Props = struct { name: [:0]const u8 };
+  const props = Props{ .name = "codebase" };
+  ezig_templates.@"index.html"(Props, bw.writer().any(), props);
+
+  try bw.flush();
+}
+```
+
+## Examples
+
+Find test cases covering several examples in [examples/tests.zig](./examples/tests.zig).
+
+## Features
+
+- Capture and immediately render a string-valued expression using the syntax `<%= expression %>`. This is useful for rendering a string prop.
+- Execute a code snippet without rendering it immediately using the syntax `<% snippet %>`. This is useful for formatting, control flow, and rendering a nested template.
+- When rendering, the following identifiers are always defined:
+  - `std`: the standard library.
+  - `writer`: the `std.io.AnyWriter` instance where this template is being rendered.
+  - `props`: the props provided by the caller.
+
+### Rendering a string prop
+
+`<%= props.name %>`
+
+### Rendering a non-string prop
+
+`<% writer.print("{d}", .{ props.float_value }); %>`
+
+### Iteration
+
+```
+<% for (props.dogs) |dog| { %>
+  <tr>
+    <td><%= dog.name %></td>
+    <td><%= dog.description %></td>
+  </tr>
+<% } %>
+```
+
+### Nested templates
+
+Given a template file named `dog_details.html.ezig`...
+
+```
+<%
+  const NestedTemplateProps = struct { name: [:0]const u8, description: [:0]const u8 };
+  const nestedTempalteProps = NestedTemplateProps{ .name = props.name, .description = props.description };
+  @"dog_details.html"(NestedTemplateProps, writer, nestedTemplateProps);
+%>
+```
