@@ -44,14 +44,20 @@ fn generate(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
 
     const output_file = try std.fs.cwd().createFile(output_file_path, .{});
     defer output_file.close();
-    const output_file_writer = output_file.writer().any();
+
+    var output_file_buffered_writer = std.io.bufferedWriter(output_file.writer());
+
+    var output_file_writer = output_file_buffered_writer.writer().any();
 
     var templates_walker = try TemplatesWalker.init(allocator, templates_path);
     defer templates_walker.deinit();
 
     const dependencies_file = try std.fs.cwd().createFile(dependencies_file_path, .{});
     defer dependencies_file.close();
-    const dependencies_file_writer = dependencies_file.writer().any();
+
+    var depenencies_file_buffered_writer = std.io.bufferedWriter(dependencies_file.writer());
+
+    const dependencies_file_writer = depenencies_file_buffered_writer.writer().any();
 
     try output_file_writer.writeAll("const std = @import(\"std\");\n\n");
     try dependencies_file_writer.writeAll("ezig_templates:");
@@ -62,6 +68,9 @@ fn generate(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
 
         try dependencies_file_writer.print(" {s}/{s}", .{ templates_path, template.path });
     }
+
+    try depenencies_file_buffered_writer.flush();
+    try output_file_buffered_writer.flush();
 }
 
 fn fatal(comptime format: []const u8, args: anytype) noreturn {

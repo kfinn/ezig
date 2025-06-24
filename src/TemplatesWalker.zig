@@ -34,7 +34,7 @@ pub fn next(self: *@This()) !?Template {
 
     while (try self.walker.next()) |walker_entry| {
         if (walker_entry.kind == .file and Template.isTemplatePath(walker_entry.path)) {
-            self.opt_last_template = try Template.init(self.allocator, self.dir, walker_entry.path, walker_entry.basename);
+            self.opt_last_template = Template.init(self.dir, walker_entry.path);
             return self.opt_last_template;
         }
     }
