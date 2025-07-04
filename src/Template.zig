@@ -64,138 +64,151 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
     const quote_token = "\"";
     const escape_token = "\\";
 
-    var state: State = .text;
     try writeTextNodeStartToZigSource(writer);
 
-    outer: while (true) {
-        switch (state) {
-            .text => {
-                if (lookahead_iterator.consume(start_code_expression_token)) {
+    state: switch (State.text) {
+        .text => {
+            if (lookahead_iterator.consume(start_code_expression_token)) {
+                try writeTextNodeEndToZigSource(writer);
+                try writeCodeExpressionNodeStartToZigSource(writer);
+                continue :state .code_expression;
+            } else if (lookahead_iterator.consume(start_code_snippet_token)) {
+                try writeTextNodeEndToZigSource(writer);
+                try writeCodeSnippetNodeStartToZigSource(writer);
+                continue :state .code_snippet;
+            } else if (lookahead_iterator.consume(newline_token)) {
+                try writer.writeAll("\\n");
+                continue :state .text;
+            } else if (lookahead_iterator.consume(quote_token)) {
+                try writer.writeAll("\\\\");
+                continue :state .text;
+            } else if (lookahead_iterator.consume(escape_token)) {
+                try writer.writeByte('\\');
+                continue :state .text;
+            } else {
+                if (lookahead_iterator.next()) |next_character| {
+                    try writer.writeByte(next_character);
+                    continue :state .text;
+                } else {
                     try writeTextNodeEndToZigSource(writer);
-                    state = .code_expression;
-                    try writeCodeExpressionNodeStartToZigSource(writer);
-                } else if (lookahead_iterator.consume(start_code_snippet_token)) {
-                    try writeTextNodeEndToZigSource(writer);
-                    state = .code_snippet;
-                    try writeCodeSnippetNodeStartToZigSource(writer);
-                } else if (lookahead_iterator.consume(newline_token)) {
-                    try writer.writeAll("\\n");
-                } else if (lookahead_iterator.consume(quote_token)) {
-                    try writer.writeAll("\\\\");
-                } else if (lookahead_iterator.consume(escape_token)) {
-                    try writer.writeByte('\\');
-                } else {
-                    if (lookahead_iterator.next()) |next_character| {
-                        try writer.writeByte(next_character);
-                    } else {
-                        try writeTextNodeEndToZigSource(writer);
-                        break :outer;
-                    }
+                    break :state;
                 }
-            },
-            .code_expression => {
-                if (lookahead_iterator.consume(end_code_token)) {
-                    try writeCodeExpressionNodeEndToZigSource(writer);
-                    state = .text;
-                    try writeTextNodeStartToZigSource(writer);
-                } else if (lookahead_iterator.consume(start_multiline_string_literal_token)) {
-                    try writer.writeAll(start_multiline_string_literal_token);
-                    state = .code_expression_multiline_string_literal;
-                } else if (lookahead_iterator.consume(start_comment_token)) {
-                    state = .code_expression_comment;
-                } else if (lookahead_iterator.consume(start_string_literal_token)) {
-                    try writer.writeAll(start_string_literal_token);
-                    state = .code_expression_string_literal;
-                } else if (lookahead_iterator.consume(newline_token)) {
-                    try writer.writeAll(newline_token);
-                    state = .code_expression;
-                } else {
-                    try writer.writeByte(lookahead_iterator.next().?);
-                }
-            },
-            .code_expression_string_literal => {
-                if (lookahead_iterator.consume(escaped_backslash_token)) {
-                    try writer.writeAll(escaped_backslash_token);
-                } else if (lookahead_iterator.consume(escaped_quote_token)) {
-                    try writer.writeAll(escaped_quote_token);
-                } else if (lookahead_iterator.consume(quote_token)) {
-                    try writer.writeAll(quote_token);
-                    state = .code_expression;
-                } else {
-                    try writer.writeByte(lookahead_iterator.next().?);
-                }
-            },
-            .code_expression_multiline_string_literal => {
-                if (lookahead_iterator.consume(newline_token)) {
-                    try writer.writeAll(newline_token);
-                    state = .code_expression;
-                } else {
-                    try writer.writeByte(lookahead_iterator.next().?);
-                }
-            },
-            .code_expression_comment => {
-                if (lookahead_iterator.consume(end_code_token)) {
-                    try writeCodeSnippetNodeEndToZigSource(writer);
-                    state = .text;
-                    try writeTextNodeStartToZigSource(writer);
-                } else if (lookahead_iterator.consume(newline_token)) {
-                    state = .code_expression;
-                } else {
-                    lookahead_iterator.skip(1);
-                }
-            },
-            .code_snippet => {
-                if (lookahead_iterator.consume(end_code_token)) {
-                    try writeCodeSnippetNodeEndToZigSource(writer);
-                    state = .text;
-                    try writeTextNodeStartToZigSource(writer);
-                } else if (lookahead_iterator.consume(start_multiline_string_literal_token)) {
-                    try writer.writeAll(start_multiline_string_literal_token);
-                    state = .code_snippet_multiline_string_literal;
-                } else if (lookahead_iterator.consume(start_comment_token)) {
-                    state = .code_snippet_comment;
-                } else if (lookahead_iterator.consume(start_string_literal_token)) {
-                    try writer.writeAll(start_string_literal_token);
-                    state = .code_snippet_string_literal;
-                } else if (lookahead_iterator.consume(newline_token)) {
-                    try writer.writeAll(newline_token);
-                    state = .code_snippet;
-                } else {
-                    try writer.writeByte(lookahead_iterator.next().?);
-                }
-            },
-            .code_snippet_string_literal => {
-                if (lookahead_iterator.consume(escaped_backslash_token)) {
-                    try writer.writeAll(escaped_backslash_token);
-                } else if (lookahead_iterator.consume(escaped_quote_token)) {
-                    try writer.writeAll(escaped_quote_token);
-                } else if (lookahead_iterator.consume(quote_token)) {
-                    try writer.writeAll(quote_token);
-                    state = .code_snippet;
-                } else {
-                    try writer.writeByte(lookahead_iterator.next().?);
-                }
-            },
-            .code_snippet_multiline_string_literal => {
-                if (lookahead_iterator.consume(newline_token)) {
-                    try writer.writeAll(newline_token);
-                    state = .code_snippet;
-                } else {
-                    try writer.writeByte(lookahead_iterator.next().?);
-                }
-            },
-            .code_snippet_comment => {
-                if (lookahead_iterator.consume(end_code_token)) {
-                    try writeCodeSnippetNodeEndToZigSource(writer);
-                    state = .text;
-                    try writeTextNodeStartToZigSource(writer);
-                } else if (lookahead_iterator.consume(newline_token)) {
-                    state = .code_snippet;
-                } else {
-                    lookahead_iterator.skip(1);
-                }
-            },
-        }
+            }
+        },
+        .code_expression => {
+            if (lookahead_iterator.consume(end_code_token)) {
+                try writeCodeExpressionNodeEndToZigSource(writer);
+                try writeTextNodeStartToZigSource(writer);
+                continue :state .text;
+            } else if (lookahead_iterator.consume(start_multiline_string_literal_token)) {
+                try writer.writeAll(start_multiline_string_literal_token);
+                continue :state .code_expression_multiline_string_literal;
+            } else if (lookahead_iterator.consume(start_comment_token)) {
+                continue :state .code_expression_comment;
+            } else if (lookahead_iterator.consume(start_string_literal_token)) {
+                try writer.writeAll(start_string_literal_token);
+                continue :state .code_expression_string_literal;
+            } else if (lookahead_iterator.consume(newline_token)) {
+                try writer.writeAll(newline_token);
+                continue :state .code_expression;
+            } else {
+                try writer.writeByte(lookahead_iterator.next().?);
+                continue :state .code_expression;
+            }
+        },
+        .code_expression_string_literal => {
+            if (lookahead_iterator.consume(escaped_backslash_token)) {
+                try writer.writeAll(escaped_backslash_token);
+                continue :state .code_expression_string_literal;
+            } else if (lookahead_iterator.consume(escaped_quote_token)) {
+                try writer.writeAll(escaped_quote_token);
+                continue :state .code_expression_string_literal;
+            } else if (lookahead_iterator.consume(quote_token)) {
+                try writer.writeAll(quote_token);
+                continue :state .code_expression;
+            } else {
+                try writer.writeByte(lookahead_iterator.next().?);
+                continue :state .code_expression_string_literal;
+            }
+        },
+        .code_expression_multiline_string_literal => {
+            if (lookahead_iterator.consume(newline_token)) {
+                try writer.writeAll(newline_token);
+                continue :state .code_expression;
+            } else {
+                try writer.writeByte(lookahead_iterator.next().?);
+                continue :state .code_expression_multiline_string_literal;
+            }
+        },
+        .code_expression_comment => {
+            if (lookahead_iterator.consume(end_code_token)) {
+                try writeCodeSnippetNodeEndToZigSource(writer);
+                try writeTextNodeStartToZigSource(writer);
+                continue :state .text;
+            } else if (lookahead_iterator.consume(newline_token)) {
+                continue :state .code_expression;
+            } else {
+                lookahead_iterator.skip(1);
+                continue :state .code_expression_comment;
+            }
+        },
+        .code_snippet => {
+            if (lookahead_iterator.consume(end_code_token)) {
+                try writeCodeSnippetNodeEndToZigSource(writer);
+                try writeTextNodeStartToZigSource(writer);
+                continue :state .text;
+            } else if (lookahead_iterator.consume(start_multiline_string_literal_token)) {
+                try writer.writeAll(start_multiline_string_literal_token);
+                continue :state .code_snippet_multiline_string_literal;
+            } else if (lookahead_iterator.consume(start_comment_token)) {
+                continue :state .code_snippet_comment;
+            } else if (lookahead_iterator.consume(start_string_literal_token)) {
+                try writer.writeAll(start_string_literal_token);
+                continue :state .code_snippet_string_literal;
+            } else if (lookahead_iterator.consume(newline_token)) {
+                try writer.writeAll(newline_token);
+                continue :state .code_snippet;
+            } else {
+                try writer.writeByte(lookahead_iterator.next().?);
+                continue :state .code_snippet;
+            }
+        },
+        .code_snippet_string_literal => {
+            if (lookahead_iterator.consume(escaped_backslash_token)) {
+                try writer.writeAll(escaped_backslash_token);
+                continue :state .code_snippet_string_literal;
+            } else if (lookahead_iterator.consume(escaped_quote_token)) {
+                try writer.writeAll(escaped_quote_token);
+                continue :state .code_snippet_string_literal;
+            } else if (lookahead_iterator.consume(quote_token)) {
+                try writer.writeAll(quote_token);
+                continue :state .code_snippet;
+            } else {
+                try writer.writeByte(lookahead_iterator.next().?);
+                continue :state .code_snippet_string_literal;
+            }
+        },
+        .code_snippet_multiline_string_literal => {
+            if (lookahead_iterator.consume(newline_token)) {
+                try writer.writeAll(newline_token);
+                continue :state .code_snippet;
+            } else {
+                try writer.writeByte(lookahead_iterator.next().?);
+                continue :state .code_snippet_multiline_string_literal;
+            }
+        },
+        .code_snippet_comment => {
+            if (lookahead_iterator.consume(end_code_token)) {
+                try writeCodeSnippetNodeEndToZigSource(writer);
+                try writeTextNodeStartToZigSource(writer);
+                continue :state .text;
+            } else if (lookahead_iterator.consume(newline_token)) {
+                continue :state .code_snippet;
+            } else {
+                lookahead_iterator.skip(1);
+                continue :state .code_snippet_comment;
+            }
+        },
     }
 
     try writer.print("}}\n", .{});
