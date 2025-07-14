@@ -43,6 +43,7 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
 
     const State = union(enum) {
         text,
+        code_expression_format,
         code_expression,
         code_expression_string_literal,
         code_expression_multiline_string_literal,
@@ -53,6 +54,8 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
         code_snippet_comment,
     };
     const start_code_expression_token = "<%=";
+    const start_code_expression_format_token = "<%{";
+    const end_code_expression_format_token = "}=";
     const start_code_snippet_token = "<%";
     const end_code_token = "%>";
     const start_multiline_string_literal_token = "\\\\";
@@ -68,7 +71,11 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
 
     state: switch (State.text) {
         .text => {
-            if (lookahead_iterator.consume(start_code_expression_token)) {
+            if (lookahead_iterator.consume(start_code_expression_format_token)) {
+                try writeTextNodeEndToZigSource(writer);
+                try writeCodeExpressionFormatNodeStartToZigSource(writer);
+                continue :state .code_expression_format;
+            } else if (lookahead_iterator.consume(start_code_expression_token)) {
                 try writeTextNodeEndToZigSource(writer);
                 try writeCodeExpressionNodeStartToZigSource(writer);
                 continue :state .code_expression;
@@ -93,6 +100,15 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
                     try writeTextNodeEndToZigSource(writer);
                     break :state;
                 }
+            }
+        },
+        .code_expression_format => {
+            if (lookahead_iterator.consume(end_code_expression_format_token)) {
+                try writeCodeExpressionFormatNodeEndToZigSource(writer);
+                continue :state .code_expression;
+            } else {
+                try writer.writeByte(lookahead_iterator.next().?);
+                continue :state .code_expression_format;
             }
         },
         .code_expression => {
@@ -214,24 +230,34 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
     try writer.print("}}\n", .{});
 }
 
-fn writeTextNodeStartToZigSource(writer: std.io.AnyWriter) !void {
+fn writeTextNodeStartToZigSource(writer: anytype) @TypeOf(writer).Error!void {
     try writer.writeAll("try writer.writeAll(\"");
 }
 
-fn writeTextNodeEndToZigSource(writer: std.io.AnyWriter) !void {
+fn writeTextNodeEndToZigSource(writer: anytype) @TypeOf(writer).Error!void {
     try writer.writeAll("\");\n");
 }
 
-fn writeCodeExpressionNodeStartToZigSource(writer: std.io.AnyWriter) !void {
-    try writer.writeAll("try writer.print(\"{s}\", .{");
+fn writeCodeExpressionNodeStartToZigSource(writer: anytype) @TypeOf(writer).Error!void {
+    try writeCodeExpressionFormatNodeStartToZigSource(writer);
+    try writer.writeAll("s");
+    try writeCodeExpressionFormatNodeEndToZigSource(writer);
 }
 
-fn writeCodeExpressionNodeEndToZigSource(writer: std.io.AnyWriter) !void {
+fn writeCodeExpressionFormatNodeStartToZigSource(writer: anytype) @TypeOf(writer).Error!void {
+    try writer.writeAll("try writer.print(\"{");
+}
+
+fn writeCodeExpressionFormatNodeEndToZigSource(writer: anytype) @TypeOf(writer).Error!void {
+    try writer.writeAll("}\", .{");
+}
+
+fn writeCodeExpressionNodeEndToZigSource(writer: anytype) @TypeOf(writer).Error!void {
     try writer.writeAll("});\n");
 }
 
-fn writeCodeSnippetNodeStartToZigSource(_: std.io.AnyWriter) !void {}
+fn writeCodeSnippetNodeStartToZigSource(writer: anytype) @TypeOf(writer).Error!void {}
 
-fn writeCodeSnippetNodeEndToZigSource(writer: std.io.AnyWriter) !void {
+fn writeCodeSnippetNodeEndToZigSource(writer: anytype) @TypeOf(writer).Error!void {
     try writer.writeByte('\n');
 }

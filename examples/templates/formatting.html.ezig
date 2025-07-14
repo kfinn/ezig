@@ -1,0 +1,1 @@
+<div><%{X:#<3}= props.number %></div>

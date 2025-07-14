@@ -32,6 +32,20 @@ test "quotes" {
     try std.testing.expectEqualStrings("<span style=\"font-family: monospace\">\"Text\"</span>", squished_actual);
 }
 
+test "formatting" {
+    var buf = std.ArrayList(u8).init(std.testing.allocator);
+    defer buf.deinit();
+    const writer = buf.writer().any();
+
+    try ezig_templates.@"formatting.html"(struct { number: u32 }, writer, .{ .number = 0xf0 });
+
+    const actual = try buf.toOwnedSliceSentinel(0);
+    defer std.testing.allocator.free(actual);
+    const squished_actual = try squish(std.testing.allocator, actual);
+    defer std.testing.allocator.free(squished_actual);
+    try std.testing.expectEqualStrings("<div>F0#</div>", squished_actual);
+}
+
 test "escaping" {
     var buf = std.ArrayList(u8).init(std.testing.allocator);
     defer buf.deinit();
