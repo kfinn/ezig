@@ -80,7 +80,7 @@ pub fn writeZigSource(self: *const @This(), writer: std.io.AnyWriter) !void {
                 try writer.writeAll("\\n");
                 continue :state .text;
             } else if (lookahead_iterator.consume(quote_token)) {
-                try writer.writeAll("\\\\");
+                try writer.writeAll("\\\"");
                 continue :state .text;
             } else if (lookahead_iterator.consume(escape_token)) {
                 try writer.writeByte('\\');

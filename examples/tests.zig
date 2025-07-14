@@ -18,6 +18,20 @@ test "hello world" {
     try std.testing.expectEqualStrings("<h1>Hello, World!</h1>", squished_actual);
 }
 
+test "quotes" {
+    var buf = std.ArrayList(u8).init(std.testing.allocator);
+    defer buf.deinit();
+    const writer = buf.writer().any();
+
+    try ezig_templates.@"quotes.html"(struct {}, writer, .{});
+
+    const actual = try buf.toOwnedSliceSentinel(0);
+    defer std.testing.allocator.free(actual);
+    const squished_actual = try squish(std.testing.allocator, actual);
+    defer std.testing.allocator.free(squished_actual);
+    try std.testing.expectEqualStrings("<span style=\"font-family: monospace\">\"Text\"</span>", squished_actual);
+}
+
 test "escaping" {
     var buf = std.ArrayList(u8).init(std.testing.allocator);
     defer buf.deinit();

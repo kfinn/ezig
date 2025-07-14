@@ -1,0 +1,2 @@
+<% _ = props; %>
+<span style="font-family: monospace">"Text"</span>
