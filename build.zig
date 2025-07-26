@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) void {
         .target = b.graph.host,
     });
 
-    const examples_ezig_templates_mod = addEzigTemplateImportExe(examples_mod, .{ .path = "examples/templates" }, examples_ezig_exe);
+    const examples_ezig_templates_mod = addEzigTemplateImportExe(examples_mod, .{ .path = b.path("examples/templates") }, examples_ezig_exe);
     examples_ezig_templates_mod.addImport("app", examples_mod);
 
     const examples_tests = b.addTest(.{
@@ -56,7 +56,7 @@ pub fn build(b: *std.Build) void {
 }
 
 pub const EzigTemplatesImportOptions = struct {
-    path: []const u8,
+    path: std.Build.LazyPath,
     import_name: []const u8 = "ezig_templates",
 };
 
@@ -75,12 +75,12 @@ fn addEzigTemplateImportExe(module: *std.Build.Module, options: EzigTemplatesImp
     ezig_list_only_step.has_side_effects = true;
     ezig_list_only_step.addArg("list");
     const ezig_list_only_output = ezig_list_only_step.addOutputFileArg("ezig_templates_list.txt");
-    ezig_list_only_step.addDirectoryArg(b.path(options.path));
+    ezig_list_only_step.addDirectoryArg(options.path);
 
     const ezig_generate_step = b.addRunArtifact(ezig_exe);
     ezig_generate_step.addArg("generate");
     const ezig_output = ezig_generate_step.addOutputFileArg("ezig_templates.zig");
-    ezig_generate_step.addDirectoryArg(b.path(options.path));
+    ezig_generate_step.addDirectoryArg(options.path);
     _ = ezig_generate_step.addDepFileOutputArg("ezig_templates.d");
     ezig_generate_step.addFileInput(ezig_list_only_output);
 
