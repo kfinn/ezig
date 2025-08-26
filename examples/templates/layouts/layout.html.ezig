@@ -2,7 +2,7 @@
   <head>
     <title>
       <%
-        if (@hasDecl(Props, "writeTitle")) {
+        if (std.meta.hasMethod(@TypeOf(props), "writeTitle")) {
           try props.writeTitle(writer);
         } else {
           try writer.writeAll("Ezig");

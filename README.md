@@ -30,14 +30,15 @@ const std = @import("std");
 const ezig_templates = @import("ezig_templates");
 
 pub fn main() !void {
-  const stdout_file = std.io.getStdOut().writer();
-  var bw = std.io.bufferedWriter(stdout_file);
+  var stdout_buffer: [4096]u8 = undefined;
+  var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+  const stdout = &stdout_writer.interface;
 
   const Props = struct { name: [:0]const u8 };
-  const props = Props{ .name = "codebase" };
-  ezig_templates.@"index.html"(Props, bw.writer().any(), props);
+  const props: Props = .{ .name = "codebase" };
+  ezig_templates.@"index.html"(stdout, props);
 
-  try bw.flush();
+  try stdout.flush();
 }
 ```
 
@@ -53,7 +54,6 @@ Find test cases covering several examples in [examples/tests.zig](./examples/tes
   - `std`: the standard library.
   - `writer`: the `std.io.AnyWriter` instance where this template is being rendered.
   - `props`: the props provided by the caller.
-  - `Props`: the `type` of `props` provided by the caller.
 
 ### Rendering a string prop
 
@@ -81,8 +81,8 @@ Given a template file named `dog_details.html.ezig`...
 ```
 <%
   const NestedTemplateProps = struct { name: [:0]const u8, description: [:0]const u8 };
-  const nestedTemplateProps = NestedTemplateProps{ .name = props.name, .description = props.description };
-  @"dog_details.html"(NestedTemplateProps, writer, nestedTemplateProps);
+  const nested_template_props: NestedTemplateProps = .{ .name = props.name, .description = props.description };
+  @"dog_details.html"(writer, nested_template_props);
 %>
 ```
 
@@ -104,7 +104,7 @@ And a content template `content.html.ezig`:
 <div><%= props.text %></div>
 ```
 
-Compose them by including behavior in the `Props` type passed into the layout:
+Compose them by including behavior in the type of `props` passed into the layout:
 
 ```
 const LayoutProps = struct {
@@ -112,15 +112,15 @@ const LayoutProps = struct {
 
   pub fn writeBodyContent(self: *@This(), writer: std.io.AnyWriter) !void {
     const ContentProps = struct { text: [:0]const u8 };
-    const contentProps = ContentProps{ .text = self.text };
+    const content_props: ContentProps = .{ .text = self.text };
 
-    try ezig_templates.@"content.html"(ContentProps, writer, contentProps);
+    try ezig_templates.@"content.html"(writer, content_props);
   }
 }
 
-const layoutProps = LayoutProps{ .text = "Body text" };
+const layout_props: LayoutProps = .{ .text = "Body text" };
 
-try ezig_templates.@"layout.html"(LayoutProps, writer, layoutProps);
+try ezig_templates.@"layout.html"(writer, layout_props);
 ```
 
 ### View helpers
@@ -139,8 +139,8 @@ Then, add a view helper to your app:
 ```
 // Note: this helper can only be called safely with parameters that have
 // already been properly escaped for HTML rendering.
-pub fn writeLinkTo(writer: std.io.AnyWriter, body: []const u8, url: []const u8) !void {
-    try writer.print("<a href={s}>{s}</a>", .{ url, body });
+pub fn writeLinkTo(writer: *std.Io.Writer, body: []const u8, url: []const u8) std.Io.Writer.Error!void {
+    try writer.print("<a href=\"{s}\">{s}</a>", .{ url, body });
 }
 ```
 

@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const TemplatesWalker = @import("TemplatesWalker.zig");
 
 pub fn main() !void {
@@ -27,14 +28,18 @@ fn list(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
 
     const output_file = try std.fs.cwd().createFile(output_file_path, .{});
     defer output_file.close();
-    const output_file_writer = output_file.writer().any();
+
+    var output_file_buffer: [1024]u8 = undefined;
+    var output_file_writer = output_file.writer(&output_file_buffer);
+    const output_writer = &output_file_writer.interface;
 
     var templates_walker = try TemplatesWalker.init(allocator, templates_path);
     defer templates_walker.deinit();
 
     while (try templates_walker.next()) |template| {
-        try output_file_writer.print("{s}\n", .{template.path});
+        try output_writer.print("{s}\n", .{template.path});
     }
+    try output_writer.flush();
 }
 
 fn generate(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
@@ -45,9 +50,9 @@ fn generate(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     const output_file = try std.fs.cwd().createFile(output_file_path, .{});
     defer output_file.close();
 
-    var output_file_buffered_writer = std.io.bufferedWriter(output_file.writer());
-
-    var output_file_writer = output_file_buffered_writer.writer().any();
+    var output_file_buffer: [1024]u8 = undefined;
+    var output_file_writer = output_file.writer(&output_file_buffer);
+    const output_writer = &output_file_writer.interface;
 
     var templates_walker = try TemplatesWalker.init(allocator, templates_path);
     defer templates_walker.deinit();
@@ -55,22 +60,22 @@ fn generate(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     const dependencies_file = try std.fs.cwd().createFile(dependencies_file_path, .{});
     defer dependencies_file.close();
 
-    var depenencies_file_buffered_writer = std.io.bufferedWriter(dependencies_file.writer());
+    var dependencies_file_buffer: [1024]u8 = undefined;
+    var dependencies_file_writer = dependencies_file.writer(&dependencies_file_buffer);
+    const dependencies_writer = &dependencies_file_writer.interface;
 
-    const dependencies_file_writer = depenencies_file_buffered_writer.writer().any();
-
-    try output_file_writer.writeAll("const std = @import(\"std\");\n\n");
-    try dependencies_file_writer.writeAll("ezig_templates:");
+    try output_writer.writeAll("const std = @import(\"std\");\n\n");
+    try dependencies_writer.writeAll("ezig_templates:");
 
     while (try templates_walker.next()) |template| {
-        try template.writeZigSource(output_file_writer);
-        try output_file_writer.writeByte('\n');
+        try template.writeZigSource(output_writer);
+        try output_writer.writeByte('\n');
 
-        try dependencies_file_writer.print(" {s}/{s}", .{ templates_path, template.path });
+        try dependencies_writer.print(" {s}/{s}", .{ templates_path, template.path });
     }
 
-    try depenencies_file_buffered_writer.flush();
-    try output_file_buffered_writer.flush();
+    try dependencies_writer.flush();
+    try output_writer.flush();
 }
 
 fn fatal(comptime format: []const u8, args: anytype) noreturn {

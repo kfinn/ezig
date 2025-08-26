@@ -37,8 +37,10 @@ pub fn build(b: *std.Build) void {
 
     const examples_ezig_exe = b.addExecutable(.{
         .name = "examples_ezig",
-        .root_source_file = b.path("src/main.zig"),
-        .target = b.graph.host,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = b.graph.host,
+        }),
     });
 
     const examples_ezig_templates_mod = addEzigTemplateImportExe(examples_mod, .{ .path = b.path("examples/templates") }, examples_ezig_exe);
