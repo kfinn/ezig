@@ -38,7 +38,7 @@ pub fn writeZigSource(self: *const @This(), writer: *std.Io.Writer) !void {
     var template_file_reader = template_file.reader(&template_file_buffer);
     const template_reader = &template_file_reader.interface;
 
-    try writer.print("pub fn @\"{s}\"(writer: *std.Io.Writer, props: anytype) std.Io.Writer.Error!void {{\n", .{self.name()});
+    try writer.print("pub fn @\"{s}\"(writer: *std.Io.Writer, props: anytype) !void {{\n", .{self.name()});
 
     const State = union(enum) {
         text,
